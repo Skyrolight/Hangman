@@ -1,17 +1,28 @@
 #include "client.h"
 
-#define PORT 6000
-#define MAX_BUFFER 1000
+const char *EXIT = "exit";
 
 
-int ouvrirUneConnexionTcp() {
-    int socketTemp;
-    int longueurAdresse;
+void lireMessage(char tampon[]) {
+    printf("Saisir un message à envoyer :\n");
+    fgets(tampon, MAX_BUFFER, stdin);
+    strtok(tampon, "\n");
+}
+
+int testQuitter(char tampon[]) {
+    return strcmp(tampon, EXIT) == 0;
+}
+
+
+int main(int argc , char const *argv[]) {
+    int fdSocket, nbRecu, longueurAdresse, tailleMot;
     struct sockaddr_in coordonneesServeur;
+    char tampon[MAX_BUFFER], lettre, lettreUtiliseFaux[7] = { '\0' }, lettreUtiliseCorrect[25] = { '\0' }; 
+    char motCache[50] = {"\0"};
 
-    socketTemp = socket(AF_INET, SOCK_STREAM, 0);
+    fdSocket = socket(AF_INET, SOCK_STREAM, 0);
 
-    if (socket < 0) {
+    if (fdSocket < 0) {
         printf("socket incorrecte\n");
         exit(EXIT_FAILURE);
     }
@@ -27,36 +38,86 @@ int ouvrirUneConnexionTcp() {
     // le port d'écoute du serveur
     coordonneesServeur.sin_port = htons(PORT);
 
-    if (connect(socketTemp, (struct sockaddr *) &coordonneesServeur, sizeof(coordonneesServeur)) == -1) {
+    if (connect(fdSocket, (struct sockaddr *) &coordonneesServeur, sizeof(coordonneesServeur)) == -1) {
         printf("connexion impossible\n");
         exit(EXIT_FAILURE);
     }
 
     printf("connexion ok\n");
 
-    return socketTemp;
-}
+    while (1) {
+        lireMessage(tampon);
 
+        if (testQuitter(tampon)) {
+            send(fdSocket, tampon, strlen(tampon), 0);
+            break; // on quitte la boucle
+        }
 
-int main(int argc, char const *argv[]) {
-    int fdSocket;
-    int nbRecu;
-    char tampon[MAX_BUFFER];
+        // on attend la réponse du serveur
+        nbRecu = recv(fdSocket, tampon, MAX_BUFFER, 0);
 
-    fdSocket = ouvrirUneConnexionTcp();
+        if (nbRecu > 0) {
+            tampon[nbRecu] = 0;
+            printf("Recu : %s\n", tampon);
 
-    printf("Envoi du message au serveur.\n");
-    strcpy(tampon, "Message du client vers le serveur");
-    send(fdSocket, tampon, strlen(tampon), 0);
+            if (testQuitter(tampon)) {
+                break; // on quitte la boucle
+            }
+        }
 
-    nbRecu = recv(fdSocket, tampon, MAX_BUFFER, 0); // on attend la réponse du serveur
+        bool verifLettre = false;
+        printf("\nLe mot a trouver est le suivant : %s", motCache);
+        printf(" en %d lettres.\n", tailleMot);
 
-    if (nbRecu > 0) {
-        tampon[nbRecu] = 0;
-        printf("Recu : %s\n", tampon);
+        // verification que la lettre n'a pas déjà été donné
+        while (verifLettre != true){
+            printf("\nentrer une lettre : ");
+            scanf(" %c", &lettre);
+            //verification
+
+            int nbFaux = checkRecurrence(lettre, lettreUtiliseFaux);
+            int nbCorrect = checkRecurrence(lettre, lettreUtiliseCorrect);
+
+            if (nbFaux > 0 || nbCorrect > 0)
+            {
+                printf("\nAttention ! votre lettre : \"%c\" a deja ete utilise!\n", lettre);
+                verifLettre = false;
+            } else {
+                verifLettre = true;
+            }
+        }
+
+        // on envoie le message au serveur
+        send(fdSocket, tampon, strlen(tampon), 0);
+
+        // on attend la réponse du serveur
+        nbRecu = recv(fdSocket, tampon, MAX_BUFFER, 0);
+
+        if (nbRecu > 0) {
+            tampon[nbRecu] = 0;
+            printf("Recu : %s\n", tampon);
+
+            if (testQuitter(tampon)) {
+                break; // on quitte la boucle
+            }
+        }
     }
 
     close(fdSocket);
 
     return EXIT_SUCCESS;
+}
+
+int checkRecurrence(char lettre, char* lettreUtilise) {
+    int nb = 0;
+    int taille = strlen(lettreUtilise);
+
+    for (int i = 0; i <= (taille-1); i++)
+    {
+        if (lettreUtilise[i] == lettre)
+        {
+            nb++;
+        } 
+    }
+    return nb;
 }
