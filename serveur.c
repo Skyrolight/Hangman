@@ -1,17 +1,147 @@
-#include <netinet/in.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <time.h>
+#include "serveur.h"
+
+int main(int argc, char const *argv[]) {
+    FILE* fp = NULL;
+    int fdSocketAttente, fdSocketCommunication, nbRecu, tailleMot, ligneNb, erreur = 0, trouve = 1, resultat = 0;
+    struct sockaddr_in coordonneesAppelant;
+    char tampon[MAX_BUFFER], motCache[50] = {"\0"};
+    char mot[25], lettreUtiliseFaux[7] = { '\0' }, lettreUtiliseCorrect[25] = { '\0' }, lettre, firstLettre;
+
+    // ouverture du fichier contenant les mots
+    fp = fopen("mots_pendu.txt" , "r");
+    if (fp == NULL)
+    {
+        printf("Erreur ! Fichier inconnu");
+        return EXIT_FAILURE;
+    }
+    
+    // choix du mot à trouver
+    srand(time(NULL));
+    ligneNb = rand()%(LIST_SIZE - 1);
+	motChoix(ligneNb, fp, mot);
+	tailleMot = strlen(mot);
+
+        // remplace les lettres par des tiret
+        for (int i = 0; i <= 2*(tailleMot-1); i++) {
+            if (i%2 == 0)
+            {
+                motCache[i] = '_';
+            } else{
+                motCache[i] = ' ';
+            }
+        }
+    //affiche la première lettre du mot    
+    firstLettre = mot[0];
+    remplirBlanc(firstLettre, mot, motCache);
+    lettreUtiliseCorrect[0] = firstLettre;
+
+    
+
+        //printf("%s ", motCache);  //Affiche un tiret pour chaque lettre
+        //printf("\n%s", mot);  //Affiche le mot à trouver
+/*
+    fdSocketAttente = ouvrirUneSocketAttente();
+
+    socklen_t tailleCoord = sizeof(coordonneesAppelant);
+
+    if ((fdSocketCommunication = accept(fdSocketAttente, (struct sockaddr *) &coordonneesAppelant,
+                                        &tailleCoord)) == -1) {
+        printf("erreur de accept\n");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("Client connecté\n");
+
+    
+    
 
 
-#define PORT 6000
-#define MAX_BUFFER 1000
+    // on attend le message du client
+    // la fonction recv est bloquante
+    nbRecu = recv(fdSocketCommunication, tampon, MAX_BUFFER, 0);
 
+    if (nbRecu > 0) {
+        tampon[nbRecu] = 0;
+        printf("Recu : %s\n", tampon);
+    }
+
+    printf("Envoi du message au client.\n");
+    strcpy(tampon, "Message renvoyé par le serveur vers le client !");
+    // on envoie le message au client
+    send(fdSocketCommunication, tampon, strlen(tampon), 0);
+
+    close(fdSocketCommunication);
+    close(fdSocketAttente);
+*/
+
+
+
+    
+    while (erreur < 7 && trouve < tailleMot)
+    {
+        bool verifLettre = false;
+        printf("\nLe mot a trouver est le suivant : %s", motCache);
+        printf(" en %d lettres.\n", tailleMot);
+
+        // verification que la lettre n'a pas déjà été donné
+        while (verifLettre != true){
+            printf("\nentrer une lettre : ");
+            scanf(" %c", &lettre);
+            //verification
+
+            int nbFaux = checkRecurrence(lettre, lettreUtiliseFaux);
+            int nbCorrect = checkRecurrence(lettre, lettreUtiliseCorrect);
+
+            if (nbFaux > 0 || nbCorrect > 0)
+            {
+                printf("\nAttention ! votre lettre : \"%c\" a deja ete utilise!\n", lettre);
+                verifLettre = false;
+            } else {
+                verifLettre = true;
+            }
+        }
+        
+        //verification que la lettre donné est bien dans le mot
+        resultat = checkRecurrence(lettre, mot);
+        
+        {
+            static int faux = 0, correct = 0;
+            if (resultat == 0)
+            {
+                lettreUtiliseFaux[faux] = lettre;
+                faux++;
+                erreur++;
+                affPendu(erreur);
+                printf("\nCette lettre n'est pas dans ce mot");
+            } else {
+                lettreUtiliseCorrect[correct] = lettre;
+                correct++;
+                trouve= trouve + resultat;
+                printf("\nBravo ! vous avez trouve une lettre");
+            }
+
+        }
+        // convertit les tirets par les lettres qui ont été trouvées
+        remplirBlanc(lettre, mot, motCache);
+    }
+    
+
+    if (erreur == 7)
+    {
+        affPendu(8);
+        printf("\nLe mot était : %s ! Vous aurez plus de chance la prochaine fois.", mot);
+    } else if (trouve == tailleMot)
+    {
+        affPendu(9);
+        printf("\nBravo ! vous avez trouve le bon mot !");
+        printf("\nLe mot etait : %s !", motCache);
+    }
+    
+
+
+
+    return EXIT_SUCCESS;
+}
 
 
 int ouvrirUneSocketAttente() {
@@ -52,77 +182,48 @@ int ouvrirUneSocketAttente() {
     return socketTemp;
 }
 
-char* motChoix()
-{
-     FILE* fp = NULL;
-    char words[20];
-    int i = 0 , ran = 0;
+void motChoix(int ligneNb, FILE *fp, char mot[]){
+	int count=0, i=0;
+	char resultat[512];
 
-    char *ret = malloc(20);
-    if (!ret)
-        return NULL;
-    fp = fopen("mots_pendu.txt" , "r+");
-    for(; fgets(words , sizeof(words) , fp) ; i++)
-            ;
-    ran = rand() % i;
-    rewind(fp);
-    for(i = 0 ; i < ran ; i++) 
-        fgets(words , sizeof(words) , fp);
-    for (int i = 0; i < sizeof(words); i++)
-        ret[i] = words[i];
-    return ret;
+	if(fp == NULL)
+		printf("Erreur dans l'ouverture du fichier");
+	else{
+        // recherche un mot aléatoire parmi la liste donné
+		while(fgets(resultat, sizeof(resultat), fp) != NULL){
+			if(count == (ligneNb - 1)){
+				sscanf(resultat, "%s", mot);
+				break;
+			}
+			else{
+				count++;
+			}
+		}
+	}
 }
 
-int main(int argc, char const *argv[]) {
-    int fdSocketAttente;
-    int fdSocketCommunication;
-    struct sockaddr_in coordonneesAppelant;
-    char tampon[MAX_BUFFER];
-    int nbRecu;
-    char *mot;
-    srand(time(NULL));
+char* remplirBlanc(char lettre, char* mot, char motCache[]){
+    int tailleMot=strlen(mot);
 
-    mot = motChoix();
-    if (mot)
+	for(int i=0; i<=(tailleMot-1); i++){
+		if(mot[i]==lettre){ // si le mot correspond à la lettre donné, on change le tiret par la bonne lettre
+			motCache[2*i]=lettre;
+		}
+	}
+
+	return motCache;
+}
+
+int checkRecurrence(char lettre, char* lettreUtilise) {
+    int nb = 0;
+    int taille = strlen(lettreUtilise);
+
+    for (int i = 0; i <= (taille-1); i++)
     {
-        printf("%s", mot);
-        free(mot);
+        if (lettreUtilise[i] == lettre)
+        {
+            nb++;
+        } 
     }
-
-
-    fdSocketAttente = ouvrirUneSocketAttente();
-
-    socklen_t tailleCoord = sizeof(coordonneesAppelant);
-
-    if ((fdSocketCommunication = accept(fdSocketAttente, (struct sockaddr *) &coordonneesAppelant,
-                                        &tailleCoord)) == -1) {
-        printf("erreur de accept\n");
-        exit(EXIT_FAILURE);
-    }
-
-    printf("Client connecté\n");
-
-    
-    
-
-
-    // on attend le message du client
-    // la fonction recv est bloquante
-    nbRecu = recv(fdSocketCommunication, tampon, MAX_BUFFER, 0);
-
-    if (nbRecu > 0) {
-        tampon[nbRecu] = 0;
-        printf("Recu : %s\n", tampon);
-    }
-
-    printf("Envoi du message au client.\n");
-    strcpy(tampon, "Message renvoyé par le serveur vers le client !");
-    // on envoie le message au client
-    send(fdSocketCommunication, tampon, strlen(tampon), 0);
-
-    close(fdSocketCommunication);
-    close(fdSocketAttente);
-
-    return EXIT_SUCCESS;
+    return nb;
 }
-
