@@ -15,10 +15,11 @@ int testQuitter(char tampon[]) {
 
 
 int main(int argc , char const *argv[]) {
-    int fdSocket, nbRecu, longueurAdresse, tailleMot;
+    int fdSocket, motRecu, longueurAdresse, tailleMot, erreur = 0, trouve = 1, resultat = 0, i;
     struct sockaddr_in coordonneesServeur;
-    char tampon[MAX_BUFFER], lettre, lettreUtiliseFaux[7] = { '\0' }, lettreUtiliseCorrect[25] = { '\0' }; 
-    char motCache[50] = {"\0"};
+    char tampon[MAX_BUFFER]; 
+    char motCache[50] = {"\0"}, mot[25], lettre, lettreUtiliseFaux[7] = { '\0' }, lettreUtiliseCorrect[25] = { '\0' }, firstLettre;
+    bool restart = true;
 
     fdSocket = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -45,69 +46,124 @@ int main(int argc , char const *argv[]) {
 
     printf("connexion ok\n");
 
-    while (1) {
-        lireMessage(tampon);
-
-        if (testQuitter(tampon)) {
-            send(fdSocket, tampon, strlen(tampon), 0);
-            break; // on quitte la boucle
-        }
-
+    while (restart == true) {
         // on attend la réponse du serveur
-        nbRecu = recv(fdSocket, tampon, MAX_BUFFER, 0);
+        motRecu = recv(fdSocket, tampon, MAX_BUFFER, 0);
 
-        if (nbRecu > 0) {
-            tampon[nbRecu] = 0;
-            printf("Recu : %s\n", tampon);
+        if (motRecu > 0) {
+            tampon[motRecu] = 0;
+            strcpy(mot, tampon);
+            tailleMot = strlen(mot);
+                // remplace les lettres par des tiret
+                for (int i = 0; i <= 2*(tailleMot-1); i++) {
+                    if (i%2 == 0)
+                    {
+                        motCache[i] = '_';
+                    } else{
+                        motCache[i] = ' ';
+                    }
+                }
 
-            if (testQuitter(tampon)) {
-                break; // on quitte la boucle
-            }
+            //affiche la première lettre du mot    
+            firstLettre = mot[0];
+            remplirBlanc(firstLettre, mot, motCache);
+                //printf("%s ", motCache);  //Affiche un tiret pour chaque lettre
+                //printf("\n%s", mot);  //Affiche le mot à trouver
         }
+        
+        while (erreur < 7 && trouve < tailleMot) 
+        {
+            bool verifLettre = false;
+            printf("\nLe mot a trouver est le suivant : %s", motCache);
+            printf(" en %d lettres.\n", tailleMot);
 
-        bool verifLettre = false;
-        printf("\nLe mot a trouver est le suivant : %s", motCache);
-        printf(" en %d lettres.\n", tailleMot);
+            // verification que la lettre n'a pas déjà été donné
+            while (verifLettre != true){
+                //demande une lettre
+                entrerLettre(tampon);
+                lettre = tampon[0];
+                //envoie lettre
+                tampon[0] = lettre;
+                send(fdSocket, tampon, strlen(tampon), 0);
 
-        // verification que la lettre n'a pas déjà été donné
-        while (verifLettre != true){
-            printf("\nentrer une lettre : ");
-            scanf(" %c", &lettre);
-            //verification
+                // reçoit la verification
+                motRecu = recv(fdSocket, tampon, MAX_BUFFER, 0);
+                if (motRecu > 0) {
+                    if (tampon[motRecu] > 0)
+                    {
+                        tampon[motRecu] = 0;
+                        printf("\nAttention ! votre lettre : \"%c\" a deja ete utilise!\n", lettre);
+                        verifLettre = false;
+                    } else {
+                        tampon[motRecu] = 0;
+                        verifLettre = true;
+                    }
+                }
+            }
 
-            int nbFaux = checkRecurrence(lettre, lettreUtiliseFaux);
-            int nbCorrect = checkRecurrence(lettre, lettreUtiliseCorrect);
-
-            if (nbFaux > 0 || nbCorrect > 0)
+            
+            // attends verification lettre = mot
+            motRecu = recv(fdSocket, tampon, MAX_BUFFER, 0);
+            if (motRecu > 0)
             {
-                printf("\nAttention ! votre lettre : \"%c\" a deja ete utilise!\n", lettre);
-                verifLettre = false;
-            } else {
-                verifLettre = true;
+                resultat = tampon[0];
+                tampon[motRecu] = 0;
+
+                if (resultat == -1)
+                {
+                    erreur++;
+                    affPendu(erreur);
+                    printf("\nCette lettre n'est pas dans ce mot");
+                } else {
+                    trouve = trouve + resultat;
+                    printf("\nBravo ! vous avez trouve une lettre");
+                }
+            }
+
+            // convertit les tirets par les lettres qui ont été trouvées
+            remplirBlanc(lettre, mot, motCache);
+        }
+    
+
+        if (erreur == 7)
+        {
+            affPendu(8);
+            printf("\nLe mot était : %s ! Vous aurez plus de chance la prochaine fois.", mot);
+        } else if (trouve == tailleMot)
+        {
+            affPendu(9);
+            printf("\nBravo ! vous avez trouve le bon mot !");
+            printf("\nLe mot etait : %s !", motCache);
+
+            printf("\nVoulez vous recommencer ? \n");
+            printf("1. Oui");
+            printf("2. Non");
+            scanf(" %d", &i);
+            if (i == 1) {
+                memset(tampon, 0, sizeof(tampon));
+                send(fdSocket, tampon, strlen(tampon), 0);
+                printf("\nPartie recommence !\n");
+            }
+            else {
+                printf("\nPartie fini !\n");
+                restart = false;
+                close(fdSocket);
+                return EXIT_SUCCESS;
             }
         }
 
-        // on envoie le message au serveur
-        send(fdSocket, tampon, strlen(tampon), 0);
-
-        // on attend la réponse du serveur
-        nbRecu = recv(fdSocket, tampon, MAX_BUFFER, 0);
-
-        if (nbRecu > 0) {
-            tampon[nbRecu] = 0;
-            printf("Recu : %s\n", tampon);
-
-            if (testQuitter(tampon)) {
-                break; // on quitte la boucle
-            }
-        }
+        
     }
-
     close(fdSocket);
 
     return EXIT_SUCCESS;
 }
 
+
+
+
+
+/* ----- Fonction ----- */
 int checkRecurrence(char lettre, char* lettreUtilise) {
     int nb = 0;
     int taille = strlen(lettreUtilise);
@@ -120,4 +176,22 @@ int checkRecurrence(char lettre, char* lettreUtilise) {
         } 
     }
     return nb;
+}
+
+char* remplirBlanc(char lettre, char* mot, char motCache[]){
+    int tailleMot=strlen(mot);
+
+	for(int i=0; i<=(tailleMot-1); i++){
+		if(mot[i]==lettre){ // si le mot correspond à la lettre donné, on change le tiret par la bonne lettre
+			motCache[2*i]=lettre;
+		}
+	}
+
+	return motCache;
+}
+
+void entrerLettre(char tampon[]) {
+    printf("Saisir une lettre :\n");
+    fgets(tampon, MAX_BUFFER, stdin);
+    strtok(tampon, "\n");
 }

@@ -16,9 +16,10 @@
 #define MAX_BUFFER 1000
 
 int ouvrirUneConnexionTcp();
-void lireMessage(char tampon[]);
+void entrerLettre(char tampon[]);
 int testQuitter(char tampon[]);
 int checkRecurrence(char lettre, char* lettreUtilise);
+char* remplirBlanc(char lettre, char* mot, char motCache[]);
 
 void affPendu(int nbErreur);
 
