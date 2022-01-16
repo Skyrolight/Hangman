@@ -1,4 +1,3 @@
-#include "client.h"
 #include "serveur.h"
 
 void affPendu(int nbErreur) { 
