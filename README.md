@@ -12,6 +12,9 @@ Finally, in another terminal, execute the client :
 ./client
 
 
+------------------------------------------------------
+/* FRANCAIS */
+
 #Pendu
 Jeu du pendu écrit en C
 
